@@ -2,8 +2,8 @@ import Orange
 import pandas as pd
 from Orange.data import Table
 from Orange.classification import CN2Learner, CN2UnorderedLearner
-# data = Table('titanic')
-data = Table('iris.tab')
+data = Table('titanic')
+# data = Table('iris.tab')
 learner = CN2Learner()
 classifier1 = learner(data)
 df = pd.DataFrame(data.X_df)

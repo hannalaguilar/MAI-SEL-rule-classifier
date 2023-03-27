@@ -2,7 +2,6 @@ import copy
 from pathlib import Path
 from typing import Optional, List, Tuple, Union
 from dataclasses import dataclass, field
-from scipy import stats
 import numpy as np
 import pandas as pd
 
@@ -19,9 +18,8 @@ class DataCSV:
     dataframe: pd.DataFrame = field(init=False)
     attributes_names: Union[List[str], List[int]] = field(init=False)
     target_names: str = field(init=False)
-    n_attributes: int = field(init=False)
     n_target: int = field(init=False)
-    target: int = field(init=False)
+    n_attributes: int = field(init=False)
     X_df: np.ndarray = field(init=False)
     Y_df: np.ndarray = field(init=False)
 
@@ -30,49 +28,18 @@ class DataCSV:
         self.attributes_names = self.dataframe.iloc[:, :-1].columns
         self.target_names = self.dataframe.iloc[:, -1].unique()
         self.n_attributes = len(self.attributes_names)
-        self.n_target = len(self.target_names)
+
         self.X_df = self.dataframe.iloc[:, :-1].values
         self.Y_df = self.dataframe.iloc[:, -1].values
 
         if self.Y_df.dtype == 'float64':
             self.Y_df = self.Y_df.astype('int64')
 
-
-    #
-    # def _preprocess_data(self) -> None:
-    #     # copy dataframe
-    #     processed_data = self.data.copy()
-    #     X_df = processed_data.iloc[:, :-1]
-    #
-    #     # get attributes types
-    #     continuous_attribute = X_df.select_dtypes(include='number').columns
-    #     cat_attribute = X_df.select_dtypes(exclude='number').columns
-    #
-    #     if self.verbose:
-    #         print(f' Num. continuous attributes: {len(continuous_attribute)}')
-    #         print(f' Num. categorical attributes: {len(cat_attribute)}')
-    #
-    #     # check if continuous attributes exists
-    #     if len(continuous_attribute) != 0:
-    #         for attribute in continuous_attribute:
-    #             dis = KBinsDiscretizer(n_bins=self.n_bins, encode='ordinal',
-    #                                    strategy='quantile')
-    #             attribute_values = processed_data[attribute].values.\
-    #                 reshape(-1, 1)
-    #             discretized_attribute = dis.fit_transform(attribute_values)
-    #             processed_data[attribute] = discretized_attribute.ravel()
-    #     self.processed_data = processed_data
-
-
-
 @dataclass
 class Rule:
     attribute: int
     value: float
     consequent: Optional[int]
-    complex_quality: Optional[float] = None
-    is_significance: Optional[bool] = None
-
     def __str__(self):
         antecedent_str = f'X{self.attribute}={self.value}'
         return f'IF {antecedent_str} THEN y={self.consequent}'
@@ -85,24 +52,19 @@ class Rule:
                    covered_examples: np.ndarray[bool]) -> np.ndarray[int]:
         return calculate_class_dist(Y[covered_examples], np.max(Y) + 1)
 
-
-
 @dataclass
 class CN2Classifier:
-    name: str = 'cn2'
-    complex_quality_evaluator: str = 'entropy'
-    test_significance: str = 'likelihood ratio statistic'
     verbose: bool = True
     n_bins: int = 3
+    name: str = 'cn2'
     max_rules: int = 10
     min_covered_examples: int = 1
-
 
     def stopping(self, X: np.ndarray) -> bool:
         return X.shape[0] < self.min_covered_examples
 
-    @staticmethod
-    def _remove_covered_examples(X: np.ndarray,
+    def _remove_covered_examples(self,
+                                 X: np.ndarray,
                                  Y: np.ndarray,
                                  rule: Rule) -> Tuple[np.ndarray, np.ndarray]:
         covered_examples = rule.satisfies_conditions(X)
@@ -110,12 +72,11 @@ class CN2Classifier:
 
     def find_rules(self, data: DataCSV):
         X = data.X_df
-        Y = data.Y_df
-
-        initial_class_dist = calculate_class_dist(Y, data.n_target)
+        Y: data.Y_df
+        initial_class_dist = calculate_class_dist(Y, data.)
         rule_list = []
         while not self.stopping(X):
-            new_rule = self.find_best_complex(X, Y, rule_list, initial_class_dist)
+            new_rule = self.rule_finder(X, Y, rule_list)
             if new_rule is None:
                 break
             X, Y = self._remove_covered_examples(X, Y, new_rule)
@@ -124,55 +85,19 @@ class CN2Classifier:
                 break
         return rule_list
 
-    def find_best_complex(self,
-                    X: np.ndarray,
-                    Y: np.ndarray,
-                    rule_list: List[Rule],
-                    init_class_dist: np.ndarray):
-
-        best_complex = None
-        best_complex_quality = 0
-
+    def rule_finder(self, X: np.ndarray, Y: np.ndarray, rule_list: List[Rule]):
+        best_rule = None
+        best_score = -1
         for attribute in range(X.shape[1]):
             for value in np.unique(X[:, attribute]):
                 rule = Rule(attribute, value, None)
                 covered_examples = rule.satisfies_conditions(X)
                 class_dist = rule.class_dist(Y, covered_examples)
-                rule.complex_quality = self._entropy_measure(class_dist)
-                lrs, p = self._get_significance(class_dist, init_class_dist)
-                rule.is_significance = self._is_significance(lrs, p)
-
-                if (rule.complex_quality > best_complex_quality) and rule.is_significance:
-                    best_complex = rule
-
-        return best_complex
-
-    @staticmethod
-    def _entropy_measure(class_dist: np.ndarray) -> float:
-        class_dist = class_dist[class_dist != 0]
-        class_dist /= class_dist.sum()
-        class_dist *= -np.log2(class_dist)
-        return -class_dist.sum()
-
-    @staticmethod
-    def _get_significance(class_dist: np.ndarray,
-                          expected_dist: np.ndarray) -> Tuple[float, float]:
-
-        # if there is a 0 value, replace for a low value
-        class_dist[class_dist == 0] = 1e-4
-        expected_dist[expected_dist == 0] = 1e-4
-        expected_dist = (class_dist.sum() / expected_dist.sum()) * expected_dist
-
-        lrs = 2 * np.sum(class_dist * np.log(class_dist / expected_dist))
-        p = 1 - stats.chi2.cdf(lrs, df=1)
-
-        return lrs, p
-
-    @staticmethod
-    def _is_significance(lrs: float, p: float, alpha: float = 1) -> bool:
-        return lrs > 0 and p <= alpha
-
-
+                score = self._evaluate_rule(covered_examples, class_dist, Y.shape[0], rule_list)
+                if score > best_score:
+                    best_rule = Rule(attribute, value, np.argmax(class_dist))
+                    best_score = score
+        return best_rule
 
     def _evaluate_rule(self, covered_examples, class_dist, num_examples, rule_list):
         num_covered = len(covered_examples)
