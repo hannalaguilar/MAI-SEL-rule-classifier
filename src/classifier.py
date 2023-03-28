@@ -81,52 +81,64 @@ class Selector:
 @dataclass
 class Rule:
     selectors: List[Selector]
+    X: np.ndarray = None
+    Y: np.ndarray = None
     class_dist: np.ndarray = None
     consequent: Optional[int] = None
     complex_quality: Optional[float] = None
     is_significance: Optional[bool] = None
 
+    def covered_example(self):
+        covered_examples = np.ones(self.X.shape[0], dtype=bool)
+        for selector in self.selectors:
+            covered_examples &= X[:, selector.attribute] == selector.value
 
 
-    def __str__(self):
-        conditions = [s.selector for s in self.selectors]
-        condition_str = ' AND '.join(conditions)
+    # def __post_init__(self):
+    #     self.class_dist = self._get_class_dist()
+    #     self.complex_quality = self._entropy_measure()
 
-        if self.consequent is not None:
-            return f'If {condition_str} THEN y={self.consequent}'
 
-    def satisfies_conditions(self, X: np.ndarray) -> np.ndarray[bool]:
-        return X[:, self.attribute] == self.value
-
-    def _get_class_dist(self,
-                        Y: np.ndarray,
-                        covered_examples: np.ndarray[bool]) -> np.ndarray[int]:
-        return calculate_class_dist(Y[covered_examples], np.max(Y) + 1)
-
-    @staticmethod
-    def _entropy_measure(class_dist: np.ndarray) -> float:
-        class_dist = class_dist[class_dist != 0]
-        class_dist /= class_dist.sum()
-        class_dist *= -np.log2(class_dist)
-        return -class_dist.sum()
-
-    @staticmethod
-    def _get_significance(class_dist: np.ndarray,
-                          expected_dist: np.ndarray) -> Tuple[float, float]:
-        # if there is a 0 value, replace for a low value
-        class_dist[class_dist == 0] = 1e-4
-        expected_dist[expected_dist == 0] = 1e-4
-        expected_dist = (
-                                class_dist.sum() / expected_dist.sum()) * expected_dist
-
-        lrs = 2 * np.sum(class_dist * np.log(class_dist / expected_dist))
-        p = 1 - stats.chi2.cdf(lrs, df=1)
-
-        return lrs, p
-
-    @staticmethod
-    def _is_significance(lrs: float, p: float, alpha: float = 1) -> bool:
-        return lrs > 0 and p <= alpha
+    # def __str__(self):
+    #     conditions = [s.selector for s in self.selectors]
+    #     condition_str = ' AND '.join(conditions)
+    #
+    #     if self.consequent is not None:
+    #         return f'If {condition_str} THEN y={self.consequent}'
+    #
+    #
+    # def satisfies_conditions(self, X: np.ndarray) -> np.ndarray[bool]:
+    #     return X[:, self.attribute] == self.value
+    #
+    # def _get_class_dist(self,
+    #                     Y: np.ndarray,
+    #                     covered_examples: np.ndarray[bool]) -> np.ndarray[int]:
+    #     for selector in self.selectors:
+    #         return calculate_class_dist(Y[covered_examples], np.max(Y) + 1)
+    #
+    #
+    # def _entropy_measure(self) -> float:
+    #     class_dist = self.class_dist[self.class_dist != 0]
+    #     class_dist /= class_dist.sum()
+    #     class_dist *= -np.log2(class_dist)
+    #     return -class_dist.sum()
+    #
+    # @staticmethod
+    # def _get_significance(class_dist: np.ndarray,
+    #                       expected_dist: np.ndarray) -> Tuple[float, float]:
+    #     # if there is a 0 value, replace for a low value
+    #     class_dist[class_dist == 0] = 1e-4
+    #     expected_dist[expected_dist == 0] = 1e-4
+    #     expected_dist = (class_dist.sum() / expected_dist.sum()) * expected_dist
+    #
+    #     lrs = 2 * np.sum(class_dist * np.log(class_dist / expected_dist))
+    #     p = 1 - stats.chi2.cdf(lrs, df=1)
+    #
+    #     return lrs, p
+    #
+    # @staticmethod
+    # def _is_significance(lrs: float, p: float, alpha: float = 1) -> bool:
+    #     return lrs > 0 and p <= alpha
 
 
 @dataclass
@@ -178,22 +190,22 @@ class CN2Classifier:
         star = [Selector(a, op, v) for a in range(X.shape[1])
                 for v in np.unique(X[:, a]) for op in Selector.OPERATORS]
 
-        while len(star) > 0:
-            new_rules = []
-            for candidate_rule in star:
-                new_rules = func(candidate_rule)
-                rules.extend(new_rules)
-                for new_rule in new_rules:
-
-                    if (new_rule.quality > best_rule.quality and
-                            new_rule.is_significant() and
-                            new_rule not in rule_list):
-                        best_rule = new_rule
-
-            rules = sorted(rules, key=lambda x: x.quality, reverse=True)
-            rules = rules[:self.beam]
-        best_rule.create_model()
-        return best_rule
+        # while len(star) > 0:
+        #     new_rules = []
+        #     for candidate_rule in star:
+        #         new_rules = func(candidate_rule)
+        #         rules.extend(new_rules)
+        #         for new_rule in new_rules:
+        #
+        #             if (new_rule.quality > best_rule.quality and
+        #                     new_rule.is_significant() and
+        #                     new_rule not in rule_list):
+        #                 best_rule = new_rule
+        #
+        #     rules = sorted(rules, key=lambda x: x.quality, reverse=True)
+        #     rules = rules[:self.beam]
+        # best_rule.create_model()
+        # return best_rule
 
 
 #
