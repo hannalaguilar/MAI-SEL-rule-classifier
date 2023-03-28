@@ -37,7 +37,6 @@ class DataCSV:
         if self.Y_df.dtype == 'float64':
             self.Y_df = self.Y_df.astype('int64')
 
-
     #
     # def _preprocess_data(self) -> None:
     #     # copy dataframe
@@ -64,27 +63,70 @@ class DataCSV:
     #     self.processed_data = processed_data
 
 
+@dataclass
+class Selector:
+    attribute: int
+    operator: str
+    value: float
+
+    OPERATORS = ['==', '!=']
+
+    def __str__(self) -> str:
+        return f'Attribute {self.attribute}{self.operator}{self.value}'
+
+    def __repr__(self) -> str:
+        return str(self)
+
 
 @dataclass
 class Rule:
-    attribute: int
-    value: float
-    consequent: Optional[int]
+    selectors: List[Selector]
+    class_dist: np.ndarray = None
+    consequent: Optional[int] = None
     complex_quality: Optional[float] = None
     is_significance: Optional[bool] = None
 
+
+
     def __str__(self):
-        antecedent_str = f'X{self.attribute}={self.value}'
-        return f'IF {antecedent_str} THEN y={self.consequent}'
+        conditions = [s.selector for s in self.selectors]
+        condition_str = ' AND '.join(conditions)
+
+        if self.consequent is not None:
+            return f'If {condition_str} THEN y={self.consequent}'
 
     def satisfies_conditions(self, X: np.ndarray) -> np.ndarray[bool]:
         return X[:, self.attribute] == self.value
 
-    def class_dist(self,
-                   Y: np.ndarray,
-                   covered_examples: np.ndarray[bool]) -> np.ndarray[int]:
+    def _get_class_dist(self,
+                        Y: np.ndarray,
+                        covered_examples: np.ndarray[bool]) -> np.ndarray[int]:
         return calculate_class_dist(Y[covered_examples], np.max(Y) + 1)
 
+    @staticmethod
+    def _entropy_measure(class_dist: np.ndarray) -> float:
+        class_dist = class_dist[class_dist != 0]
+        class_dist /= class_dist.sum()
+        class_dist *= -np.log2(class_dist)
+        return -class_dist.sum()
+
+    @staticmethod
+    def _get_significance(class_dist: np.ndarray,
+                          expected_dist: np.ndarray) -> Tuple[float, float]:
+        # if there is a 0 value, replace for a low value
+        class_dist[class_dist == 0] = 1e-4
+        expected_dist[expected_dist == 0] = 1e-4
+        expected_dist = (
+                                class_dist.sum() / expected_dist.sum()) * expected_dist
+
+        lrs = 2 * np.sum(class_dist * np.log(class_dist / expected_dist))
+        p = 1 - stats.chi2.cdf(lrs, df=1)
+
+        return lrs, p
+
+    @staticmethod
+    def _is_significance(lrs: float, p: float, alpha: float = 1) -> bool:
+        return lrs > 0 and p <= alpha
 
 
 @dataclass
@@ -92,11 +134,11 @@ class CN2Classifier:
     name: str = 'cn2'
     complex_quality_evaluator: str = 'entropy'
     test_significance: str = 'likelihood ratio statistic'
+    beam: int = 5
+    max_rule_length: int = 5
+    min_covered_examples: int = 1
     verbose: bool = True
     n_bins: int = 3
-    max_rules: int = 10
-    min_covered_examples: int = 1
-
 
     def stopping(self, X: np.ndarray) -> bool:
         return X.shape[0] < self.min_covered_examples
@@ -115,73 +157,43 @@ class CN2Classifier:
         initial_class_dist = calculate_class_dist(Y, data.n_target)
         rule_list = []
         while not self.stopping(X):
-            new_rule = self.find_best_complex(X, Y, rule_list, initial_class_dist)
+            new_rule = self.find_best_complex(X, Y, rule_list,
+                                              initial_class_dist)
             if new_rule is None:
                 break
             X, Y = self._remove_covered_examples(X, Y, new_rule)
             rule_list.append(new_rule)
-            if len(rule_list) == self.max_rules:
-                break
+
         return rule_list
 
     def find_best_complex(self,
-                    X: np.ndarray,
-                    Y: np.ndarray,
-                    rule_list: List[Rule],
-                    init_class_dist: np.ndarray):
+                          X: np.ndarray,
+                          Y: np.ndarray,
+                          rule_list: List[Rule],
+                          init_class_dist: np.ndarray):
 
-        best_complex = None
-        best_complex_quality = 0
+        best_rules = None
 
-        for attribute in range(X.shape[1]):
-            for value in np.unique(X[:, attribute]):
-                rule = Rule(attribute, value, None)
-                covered_examples = rule.satisfies_conditions(X)
-                class_dist = rule.class_dist(Y, covered_examples)
-                rule.complex_quality = self._entropy_measure(class_dist)
-                lrs, p = self._get_significance(class_dist, init_class_dist)
-                rule.is_significance = self._is_significance(lrs, p)
+        # Step 1: Initialize STAR set as simple rules
+        star = [Selector(a, op, v) for a in range(X.shape[1])
+                for v in np.unique(X[:, a]) for op in Selector.OPERATORS]
 
-                if (rule.complex_quality > best_complex_quality) and rule.is_significance:
-                    best_complex = rule
+        while len(star) > 0:
+            new_rules = []
+            for candidate_rule in star:
+                new_rules = func(candidate_rule)
+                rules.extend(new_rules)
+                for new_rule in new_rules:
 
-        return best_complex
+                    if (new_rule.quality > best_rule.quality and
+                            new_rule.is_significant() and
+                            new_rule not in rule_list):
+                        best_rule = new_rule
 
-    @staticmethod
-    def _entropy_measure(class_dist: np.ndarray) -> float:
-        class_dist = class_dist[class_dist != 0]
-        class_dist /= class_dist.sum()
-        class_dist *= -np.log2(class_dist)
-        return -class_dist.sum()
-
-    @staticmethod
-    def _get_significance(class_dist: np.ndarray,
-                          expected_dist: np.ndarray) -> Tuple[float, float]:
-
-        # if there is a 0 value, replace for a low value
-        class_dist[class_dist == 0] = 1e-4
-        expected_dist[expected_dist == 0] = 1e-4
-        expected_dist = (class_dist.sum() / expected_dist.sum()) * expected_dist
-
-        lrs = 2 * np.sum(class_dist * np.log(class_dist / expected_dist))
-        p = 1 - stats.chi2.cdf(lrs, df=1)
-
-        return lrs, p
-
-    @staticmethod
-    def _is_significance(lrs: float, p: float, alpha: float = 1) -> bool:
-        return lrs > 0 and p <= alpha
-
-
-
-    def _evaluate_rule(self, covered_examples, class_dist, num_examples, rule_list):
-        num_covered = len(covered_examples)
-        if num_covered == 0:
-            return 0
-        purity = np.max(class_dist) / num_covered
-        coverage = num_covered / num_examples
-        complexity = len(rule_list) + 1
-        return purity * coverage / np.log2(complexity)
+            rules = sorted(rules, key=lambda x: x.quality, reverse=True)
+            rules = rules[:self.beam]
+        best_rule.create_model()
+        return best_rule
 
 
 #
@@ -193,16 +205,16 @@ class CN2Classifier:
 data = DataCSV('../data/titanic.csv')
 X = data.X_df
 y = data.Y_df
-learner = CN2Classifier(min_covered_examples=1, max_rules=10)
-rules = learner.find_rules(X, y)
+learner = CN2Classifier(min_covered_examples=1)
+rules = learner.find_rules(data)
 
 for i, rule in enumerate(rules):
     print(f'Rule {i + 1}: {rule}')
-
 
 # p = Path('../data/iris.csv')
 # model = CN2Classifier(p)
 # a = model.processed_data
 from Orange.data import Table
 from Orange.classification import CN2Learner, CN2UnorderedLearner
+
 data = Table('titanic')

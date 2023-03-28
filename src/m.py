@@ -5,6 +5,9 @@ from Orange.classification import CN2Learner, CN2UnorderedLearner
 data = Table('titanic')
 # data = Table('iris.tab')
 learner = CN2Learner()
+learner.rule_finder.general_validator.max_rule_length = 2
+learner.rule_finder.search_algorithm.beam_width = 1
+learner.rule_finder.general_validator.min_covered_examples = 10
 classifier1 = learner(data)
 df = pd.DataFrame(data.X_df)
 df['class'] = data.Y_df

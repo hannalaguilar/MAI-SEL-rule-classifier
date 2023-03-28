@@ -131,3 +131,16 @@ for i, rule in enumerate(rules):
 from Orange.data import Table
 from Orange.classification import CN2Learner, CN2UnorderedLearner
 data = Table('titanic')
+
+
+# @dataclass
+# class Selector:
+#     attribute: int
+#     operator: str
+#     value: float
+#     selector1: str
+#     selector2: str
+#
+#     def __post_init__(self):
+#         self.selector1 = f'{self.attribute} {"=="} {self.value}'
+#         self.selector2 = f'{self.attribute} {"!="} {self.value}'
