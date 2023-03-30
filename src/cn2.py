@@ -58,6 +58,20 @@ class CN2Classifier:
     k_beam: int = 10
     min_covered_examples: int = 1
 
+    def stopping(self, X: np.ndarray) -> bool:
+        return X.shape[0] < self.min_covered_examples
+
+    def find_rules(self, data: DataCSV):
+        rule_list = []
+        while not self.stopping(X):
+            new_rule = self.find_best_complex(data)
+            if new_rule is None:
+                break
+            X, Y = self._remove_covered_examples(X, Y, new_rule)
+            rule_list.append(new_rule)
+
+        return rule_list
+
     def find_best_complex(self,
                           data: DataCSV) -> Optional[List[Rule]]:
         selectors = data.selectors
