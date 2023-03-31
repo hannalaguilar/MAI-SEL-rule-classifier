@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Union, List, Optional
+from dataclasses import dataclass, field
+from typing import Union, List, Optional, NewType
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -19,38 +19,64 @@ class Rule:
         return f'{self.attribute}={self.value}'
 
 
-# @dataclass
-# class Complex:
-#     rules: List[Rule]
-#
-#     def __str__(self):
-#         conditions = [str(rule) for rule in self.rules]
-#         complex = ' AND '.join(conditions)
-#         return f'IF {complex}'
-
-
 @dataclass
 class DataCSV:
-    data_path: Union[Path, str]
+    df: pd.DataFrame
 
     @property
-    def dataframe(self) -> pd.DataFrame:
-        return pd.read_csv(self.data_path, index_col=0)
+    def target_name(self) -> str:
+        return self.df.columns[-1]
 
     @property
-    def target_name(self):
-        return self.dataframe.columns[-1]
+    def n_classes(self) -> int:
+        return self.df.iloc[:, -1].nunique()
 
     @property
-    def n_classes(self):
-        return self.dataframe.iloc[:, -1].nunique()
-
-    @property
-    def selectors(self) -> List[Rule]:
-        unique_values = self.dataframe.iloc[:, :-1]. \
+    def selectors(self) -> list[Rule]:
+        unique_values = self.df.iloc[:, :-1]. \
             apply(lambda col: sorted(col.unique())).reset_index().values
         return [Rule(attribute=row[0], value=val) for row in
                 unique_values for val in row[1]]
+
+
+@dataclass
+class Complex:
+    complex: List[Rule]
+    data: DataCSV
+    n_classes: int
+    recall: float = field(init=False)
+    precision: float = field(init=False)
+
+    def __post_init__(self):
+        self.recall, self.precision = get_recall_precision(self.data,
+                                                           self.complex)
+
+    def __str__(self):
+        conditions = [str(rule) for rule in self.complex]
+        cpx = ' AND '.join(conditions)
+        return f'IF {cpx} THEN {self.consequent}'
+
+    @property
+    def class_dist(self):
+        return calculate_class_dist(self.complex,
+                                    self.data.df[self.covered_examples],
+                                    self.n_classes)
+
+    @property
+    def consequent(self):
+        return np.argmax(self.class_dist)
+
+    @property
+    def covered_examples(self):
+        return get_covered_examples(self.data.df, self.complex)
+
+    @property
+    def output_data(self):
+        idx1 = self.data.df.index
+        idx2 = self.data.df[self.covered_examples].index
+        ii = idx1.difference(idx2, sort=False)
+        data = self.data.df.loc[ii, :]
+        return DataCSV(data.reset_index().drop('index', axis=1))
 
 
 @dataclass
@@ -58,24 +84,31 @@ class CN2Classifier:
     k_beam: int = 10
     min_covered_examples: int = 1
 
-    def stopping(self, X: np.ndarray) -> bool:
-        return X.shape[0] < self.min_covered_examples
+    def stopping(self, df: pd.DataFrame) -> bool:
+        return df.shape[0] < self.min_covered_examples
 
     def find_rules(self, data: DataCSV):
+        selectors = data.selectors
+        n_classes = data.n_classes
         rule_list = []
-        while not self.stopping(X):
-            new_rule = self.find_best_complex(data)
-            if new_rule is None:
+        while not self.stopping(data.df):
+            new_cpx = self.find_best_complex(data,
+                                             selectors,
+                                             n_classes)
+            if new_cpx is None:
                 break
-            X, Y = self._remove_covered_examples(X, Y, new_rule)
-            rule_list.append(new_rule)
+
+            aa = Complex(new_cpx, data, n_classes)
+
+            data = aa.output_data
+            rule_list.append(aa)
 
         return rule_list
 
     def find_best_complex(self,
-                          data: DataCSV) -> Optional[List[Rule]]:
-        selectors = data.selectors
-        count = 0
+                          data: DataCSV,
+                          selectors,
+                          n_classes) -> List[Rule]:
         star = [[]]
         best_cpx = None
         while star:
@@ -84,49 +117,33 @@ class CN2Classifier:
                 for sel in selectors:
                     new_cpx = cpx + [sel]
                     if new_cpx not in star and is_significant(new_cpx,
-                                                              data.dataframe,
-                                                              data.n_classes):
+                                                              data.df,
+                                                              n_classes):
                         new_star.append(new_cpx)
-                        count += 1
             new_star = remove_null_rules(new_star)
-            complex_quality = complex_score(new_star, data)
+            complex_quality = complex_score_list(new_star, data, n_classes)
             new_star = sort_by_complex(complex_quality, new_star)
 
             if not new_star:
                 break
             while len(new_star) > self.k_beam:
-                new_star.pop(0)
+                new_star = new_star[:self.k_beam]
             for cpx in new_star:
-                if best_cpx is None:
+                if best_cpx is None or user_criteria(data, n_classes, cpx,
+                                                     best_cpx):
                     best_cpx = cpx
             star = new_star
-        print(count)
+
         return best_cpx
 
 
-
-# Define the user-defined criteria
-def user_criteria(new_cpx, old_cpx, data):
-    new_cpx_accuracy = accuracy(new_cpx, data)
-    old_cpx_accuracy = accuracy(old_cpx, data)
-    return new_cpx_accuracy > old_cpx_accuracy
-
-
-# Define the accuracy function
-def accuracy(complex, data):
-    crosstab = pd.crosstab(index=data[list(complex)], columns=data['survive'])
-    if len(crosstab.index) == 1:
-        return 1.0
-    else:
-        return np.min([crosstab.loc[1, 1] / crosstab.loc[1].sum(),
-                       crosstab.loc[0, 0] / crosstab.loc[0].sum()])
-
-
 if __name__ == "__main__":
-    data_path = '../data/titanic.csv'
-    data = DataCSV(data_path)
+    DATA_PATH = '../data/titanic.csv'
+    DF = pd.read_csv(DATA_PATH, index_col=0)
+    DATA_INS = DataCSV(DF)
 
-    # Find the best complex
+    # Find the rule_list
     model = CN2Classifier()
-
-    print(model.find_best_complex(data))
+    rule_list = model.find_rules(DATA_INS)
+    for rule in rule_list:
+        print(rule)

@@ -14,39 +14,39 @@ def calculate_class_dist(Y: np.ndarray, minlength: int) -> np.ndarray:
     return np.bincount(Y, minlength=minlength)
 
 
-@dataclass
-class DataCSV:
-    data_path: Union[Path, str]
-    dataframe: pd.DataFrame = field(init=False)
-    attributes_names: Union[List[str], List[int]] = field(init=False)
-    target_name: str = field(init=False)
-    target_dist: np.ndarray = field(init=False)
-    n_attributes: int = field(init=False)
-    n_target: int = field(init=False)
-    raw_target: pd.Series = field(init=False)
-    raw_attributes: pd.DataFrame = field(init=False)
-    X_df: np.ndarray = field(init=False)
-    Y_df: np.ndarray = field(init=False)
-
-    def __post_init__(self):
-        self.dataframe = pd.read_csv(self.data_path, index_col=0)
-        self.attributes_names = self.dataframe.iloc[:, :-1].columns
-        self.attributes_int = list(range(len(self.attributes_names)))
-        self.target_name = self.dataframe.iloc[:, -1].name
-        self.target_dist = self.dataframe.iloc[:, -1].unique()
-        self.n_attributes = len(self.attributes_names)
-        self.n_target = len(self.target_dist)
-        self.raw_target = self.dataframe.iloc[:, -1]
-        self.raw_attributes = self.dataframe.iloc[:, :-1]
-
-        le = OrdinalEncoder()
-        self.Y_df = le.fit_transform(
-            self.raw_target.values.reshape(-1, 1)).ravel()
-        if self.Y_df.dtype == 'float':
-            self.Y_df = self.Y_df.astype('int')
-
-        le = OrdinalEncoder()
-        self.X_df = le.fit_transform(self.raw_attributes)
+# @dataclass
+# class DataCSV:
+#     data_path: Union[Path, str]
+#     dataframe: pd.DataFrame = field(init=False)
+#     attributes_names: Union[List[str], List[int]] = field(init=False)
+#     target_name: str = field(init=False)
+#     target_dist: np.ndarray = field(init=False)
+#     n_attributes: int = field(init=False)
+#     n_target: int = field(init=False)
+#     raw_target: pd.Series = field(init=False)
+#     raw_attributes: pd.DataFrame = field(init=False)
+#     X_df: np.ndarray = field(init=False)
+#     Y_df: np.ndarray = field(init=False)
+#
+#     def __post_init__(self):
+#         self.dataframe = pd.read_csv(self.data_path, index_col=0)
+#         self.attributes_names = self.dataframe.iloc[:, :-1].columns
+#         self.attributes_int = list(range(len(self.attributes_names)))
+#         self.target_name = self.dataframe.iloc[:, -1].name
+#         self.target_dist = self.dataframe.iloc[:, -1].unique()
+#         self.n_attributes = len(self.attributes_names)
+#         self.n_target = len(self.target_dist)
+#         self.raw_target = self.dataframe.iloc[:, -1]
+#         self.raw_attributes = self.dataframe.iloc[:, :-1]
+#
+#         le = OrdinalEncoder()
+#         self.Y_df = le.fit_transform(
+#             self.raw_target.values.reshape(-1, 1)).ravel()
+#         if self.Y_df.dtype == 'float':
+#             self.Y_df = self.Y_df.astype('int')
+#
+#         le = OrdinalEncoder()
+#         self.X_df = le.fit_transform(self.raw_attributes)
 
 
 @dataclass
@@ -258,3 +258,28 @@ init_class_dist = calculate_class_dist(data.Y_df, np.max(data.Y_df) + 1)
 #     attribute_names=['status', 'age', 'sex'])
 #
 # print(rule)
+
+
+# ACCURACY # TODO
+# Define the user-defined criteria
+def user_criteria(new_cpx, old_cpx, data):
+    new_cpx_accuracy = accuracy(new_cpx, data)
+    old_cpx_accuracy = accuracy(old_cpx, data)
+    return new_cpx_accuracy > old_cpx_accuracy
+
+
+# Define the accuracy function
+def accuracy(complex, data):
+    crosstab = pd.crosstab(index=data[list(complex)], columns=data['survive'])
+    if len(crosstab.index) == 1:
+        return 1.0
+    else:
+        return np.min([crosstab.loc[1, 1] / crosstab.loc[1].sum(),
+                       crosstab.loc[0, 0] / crosstab.loc[0].sum()])
+
+
+
+
+def get_consequent(self, data, cpx):
+    *_, consequent = self.get_recall_precision(data, cpx)
+    return consequent
