@@ -27,7 +27,7 @@ if __name__ == "__main__":
                               ['Age', 'Height', 'Weight',
                                'FCVC', 'NCP', 'CH2O', 'FAF', 'TUE'])
 
-    for dataset in [obesity_dataset]:
+    for dataset in [iris_dataset, titanic_dataset]:
         data_dir = folder_path / 'data'
         print('{:-^85}'.format(dataset.name.upper()))
         data_path = data_dir / f'{dataset.name}.csv'
