@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from sklearn.preprocessing import OrdinalEncoder, KBinsDiscretizer
+from sklearn.model_selection import train_test_split
 
 
 @dataclass
@@ -44,13 +45,30 @@ class DataCSV:
                 unique_values for val in row[1]]
 
 
+def split_dataframes(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame,
+pd.DataFrame]:
+    val_size = 0.15
+    test_size = 0.15
+    X_train_valid, X_test, y_train_valid, y_test = train_test_split(
+        df.iloc[:, :-1], df.iloc[:, -1],
+        test_size=test_size,
+        random_state=42)
+    X_train, X_valid, y_train, y_valid = train_test_split(X_train_valid,
+                                                          y_train_valid,
+                                                          test_size=val_size,
+                                                          random_state=42)
+    train_df = pd.concat([X_train, y_train], axis=1)
+    valid_df = pd.concat([X_valid, y_valid], axis=1)
+    test_df = pd.concat([X_test, y_test], axis=1)
+    return train_df, valid_df, test_df
+
+
 def preprocess_data(df,
                     continuous_attributes: List[str],
                     n_bins=3):
-
     # remove nan values if there are more than 50%
     n_rows = df.shape[0]
-    thresh = int(0.5*n_rows)
+    thresh = int(0.5 * n_rows)
     df = df.dropna(axis='columns', thresh=thresh)
 
     # copy dataframe

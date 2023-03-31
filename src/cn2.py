@@ -120,8 +120,9 @@ def run_cn2(data_path: Union[str, Path],
             verbose: bool = True) -> List:
     # Load dataframe
     df = pd.read_csv(data_path, index_col=0)
-    df, le = tools.preprocess_data(df, continuous_attributes)
-    data = DataCSV(df)
+    train_df, valid_df, test_df = tools.split_dataframes(df)
+    train_df, le = tools.preprocess_data(train_df, continuous_attributes)
+    data = DataCSV(train_df)
 
     # Find the rule_list
     model = CN2Classifier()
