@@ -26,8 +26,7 @@ class Complex:
     def __str__(self) -> str:
         conditions = [str(rule) for rule in self.complex]
         cpx = ' AND '.join(conditions)
-        return f'IF {cpx} THEN {self.consequent} | ' \
-               f'precision={self.precision:.2f}, recall={self.recall:.2f}'
+        return f'IF {cpx} THEN {self.consequent}'
 
     @property
     def class_dist(self) -> np.ndarray:
@@ -50,6 +49,10 @@ class Complex:
         idx_intersection = idx1.difference(idx2, sort=False)
         data = self.data.df.loc[idx_intersection, :]
         return DataCSV(data.reset_index().drop('index', axis=1))
+
+    @property
+    def complex_as_list(self):
+        return [self.complex, self.precision, self.recall]
 
 
 @dataclass
@@ -113,9 +116,11 @@ class CN2Classifier:
 
 
 def run_cn2(data_path: Union[str, Path],
-            verbose: bool = True) -> List[Complex]:
+            continuous_attributes: List[str],
+            verbose: bool = True) -> List:
     # Load dataframe
     df = pd.read_csv(data_path, index_col=0)
+    df, le = tools.preprocess_data(df, continuous_attributes)
     data = DataCSV(df)
 
     # Find the rule_list
@@ -125,5 +130,7 @@ def run_cn2(data_path: Union[str, Path],
     if verbose:
         for rule in rule_list:
             print(rule)
+
+    rule_list = [r.complex_as_list for r in rule_list]
 
     return rule_list

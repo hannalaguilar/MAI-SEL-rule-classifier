@@ -1,12 +1,14 @@
 """
 Main tools for performing the CN2 algorithm
 """
+import copy
 import itertools
 from typing import List, Union
 from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from scipy import stats
+from sklearn.preprocessing import OrdinalEncoder, KBinsDiscretizer
 
 
 @dataclass
@@ -32,10 +34,53 @@ class DataCSV:
 
     @property
     def selectors(self) -> list[Rule]:
-        unique_values = self.df.iloc[:, :-1]. \
-            apply(lambda col: sorted(col.unique())).reset_index().values
+        # unique_values = self.df.iloc[:, :-1]. \
+        #     apply(lambda col: sorted(col.unique())).reset_index().values
+        unique_values = []
+        for col in self.df.iloc[:, :-1].columns:
+            v = sorted(self.df[col].unique())
+            unique_values.append((col, v))
         return [Rule(attribute=row[0], value=val) for row in
                 unique_values for val in row[1]]
+
+
+def preprocess_data(df,
+                    continuous_attributes: List[str],
+                    n_bins=3):
+
+    # remove nan values if there are more than 50%
+    n_rows = df.shape[0]
+    thresh = int(0.5*n_rows)
+    df = df.dropna(axis='columns', thresh=thresh)
+
+    # copy dataframe
+    processed_df = copy.deepcopy(df)
+    discrete_attributes = [col for col in df.columns[:-1]
+                           if col not in continuous_attributes]
+
+    # replace nan values
+    continouous_df = processed_df.loc[:, continuous_attributes]
+    continouous_df.fillna(continouous_df.median(), inplace=True)
+    discrete_df = processed_df.loc[:, discrete_attributes]
+    discrete_df.fillna(discrete_df.mode(), inplace=True)
+    processed_df.loc[:, continuous_attributes] = continouous_df.values
+    processed_df.loc[:, discrete_attributes] = discrete_df.values
+
+    for attribute in continuous_attributes:
+        dis = KBinsDiscretizer(n_bins=n_bins,
+                               encode='ordinal',
+                               strategy='quantile')
+        attribute_values = processed_df[attribute].values. \
+            reshape(-1, 1)
+        discrete_attribute = dis.fit_transform(attribute_values)
+        processed_df[attribute] = discrete_attribute.ravel()
+    processed_df = processed_df
+
+    le = OrdinalEncoder()
+    processed_df_np = le.fit_transform(processed_df)
+    processed_df = pd.DataFrame(data=processed_df_np, columns=df.columns)
+
+    return processed_df, le
 
 
 def remove_null_rules(rules: List[Rule]) -> List[Rule]:

@@ -2,8 +2,8 @@ import Orange
 import pandas as pd
 from Orange.data import Table
 from Orange.classification import CN2Learner, CN2UnorderedLearner
-data = Table('titanic')
-# data = Table('iris.tab')
+# data = Table('titanic')
+data = Table('iris.tab')
 learner = CN2Learner()
 learner.rule_finder.general_validator.max_rule_length = 5
 learner.rule_finder.search_algorithm.beam_width = 10
@@ -34,3 +34,5 @@ df['class'] = data.Y_df
 
 for rule in classifier1.rule_list:
     print(rule, rule.curr_class_dist.tolist())
+
+from Orange.data.variable import ContinuousVariable

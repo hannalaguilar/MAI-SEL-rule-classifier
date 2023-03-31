@@ -1,0 +1,13 @@
+,rule,precision,recall
+0,"[Rule(attribute='petal_length', value=0.0), Rule(attribute='sepal_width', value=2.0), Rule(attribute='sepal_length', value=1.0), Rule(attribute='petal_width', value=0.0)]",1.0,0.2
+1,"[Rule(attribute='petal_length', value=0.0), Rule(attribute='petal_width', value=0.0), Rule(attribute='sepal_length', value=0.0), Rule(attribute='sepal_width', value=2.0)]",1.0,0.7
+2,"[Rule(attribute='petal_length', value=0.0), Rule(attribute='petal_width', value=0.0), Rule(attribute='sepal_length', value=0.0), Rule(attribute='sepal_width', value=1.0)]",1.0,0.9166666666666666
+3,"[Rule(attribute='petal_width', value=0.0), Rule(attribute='sepal_width', value=0.0), Rule(attribute='petal_length', value=0.0), Rule(attribute='sepal_length', value=0.0)]",1.0,1.0
+4,"[Rule(attribute='petal_length', value=1.0), Rule(attribute='sepal_width', value=2.0), Rule(attribute='petal_width', value=2.0), Rule(attribute='sepal_length', value=1.0)]",1.0,0.04
+5,"[Rule(attribute='petal_width', value=1.0), Rule(attribute='petal_length', value=1.0), Rule(attribute='sepal_length', value=1.0), Rule(attribute='sepal_width', value=0.0)]",1.0,0.3541666666666667
+6,"[Rule(attribute='petal_width', value=1.0), Rule(attribute='sepal_width', value=2.0), Rule(attribute='petal_length', value=1.0), Rule(attribute='sepal_length', value=2.0)]",1.0,0.06451612903225806
+7,"[Rule(attribute='petal_width', value=1.0), Rule(attribute='sepal_width', value=1.0), Rule(attribute='petal_length', value=1.0), Rule(attribute='sepal_length', value=2.0)]",1.0,0.1724137931034483
+8,"[Rule(attribute='petal_width', value=1.0), Rule(attribute='petal_length', value=1.0), Rule(attribute='sepal_length', value=1.0), Rule(attribute='sepal_width', value=1.0)]",1.0,0.4583333333333333
+9,"[Rule(attribute='petal_width', value=1.0), Rule(attribute='petal_length', value=1.0), Rule(attribute='sepal_length', value=2.0), Rule(attribute='sepal_width', value=0.0)]",1.0,0.23076923076923078
+10,"[Rule(attribute='petal_width', value=1.0), Rule(attribute='petal_length', value=1.0), Rule(attribute='sepal_width', value=0.0), Rule(attribute='sepal_length', value=0.0)]",1.0,0.5
+11,"[Rule(attribute='petal_width', value=1.0), Rule(attribute='petal_length', value=2.0), Rule(attribute='sepal_length', value=2.0), Rule(attribute='sepal_width', value=1.0)]",1.0,0.2
