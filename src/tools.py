@@ -6,7 +6,7 @@ from typing import List, Union
 from dataclasses import dataclass
 import numpy as np
 import pandas as pd
-from scipy import stats as stats
+from scipy import stats
 
 
 @dataclass

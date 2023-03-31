@@ -47,8 +47,8 @@ class Complex:
     def output_data(self) -> DataCSV:
         idx1 = self.data.df.index
         idx2 = self.data.df[self.covered_examples].index
-        ii = idx1.difference(idx2, sort=False)
-        data = self.data.df.loc[ii, :]
+        idx_intersection = idx1.difference(idx2, sort=False)
+        data = self.data.df.loc[idx_intersection, :]
         return DataCSV(data.reset_index().drop('index', axis=1))
 
 
