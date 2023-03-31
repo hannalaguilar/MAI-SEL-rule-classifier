@@ -114,19 +114,38 @@ class CN2Classifier:
 
         return best_cpx
 
+    @staticmethod
+    def prediction(df, rule_list):
+        # Create an empty array to hold the predictions
+        predictions = np.zeros(len(df), dtype=int)
+
+        # Loop over each rule
+        for rule in rule_list:
+            covered_examples = tools.get_covered_examples(df, rule.complex)
+            predictions[covered_examples] = 1
+
+        acc = predictions.sum() / predictions.shape[0]
+
+        return acc
+
 
 def run_cn2(data_path: Union[str, Path],
             continuous_attributes: List[str],
-            verbose: bool = True) -> List:
+            verbose: bool = True) -> tuple[List, float, float]:
+
     # Load dataframe
     df = pd.read_csv(data_path, index_col=0)
-    train_df, valid_df, test_df = tools.split_dataframes(df)
-    train_df, le = tools.preprocess_data(train_df, continuous_attributes)
+    df, le = tools.preprocess_data(df, continuous_attributes)
+    train_df, test_df = tools.split_dataframes(df)
     data = DataCSV(train_df)
 
     # Find the rule_list
     model = CN2Classifier()
     rule_list = model.find_rules(data)
+
+    # Prediction accuracy
+    train_acc = model.prediction(train_df, rule_list)
+    test_acc = model.prediction(test_df, rule_list)
 
     if verbose:
         for rule in rule_list:
@@ -134,4 +153,4 @@ def run_cn2(data_path: Union[str, Path],
 
     rule_list = [r.complex_as_list for r in rule_list]
 
-    return rule_list
+    return rule_list, train_acc, test_acc

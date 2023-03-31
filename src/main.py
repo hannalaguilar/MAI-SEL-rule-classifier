@@ -21,20 +21,22 @@ if __name__ == "__main__":
                             'sepal_width',
                             'petal_length',
                             'petal_width'])
-    titanic_dataset = Dataset('titanic2', ['Age', 'Fare'])
+    titanic_dataset = Dataset('titanic', ['Age', 'Fare'])
     obesity_dataset = Dataset('obesity',
                               ['Age', 'Height', 'Weight',
                                'FCVC', 'NCP', 'CH2O', 'FAF', 'TUE'])
 
-    for dataset in [iris_dataset]:
+    for dataset in [iris_dataset, titanic_dataset, obesity_dataset]:
         data_dir = folder_path / 'data'
         print('{:-^85}'.format(dataset.name.upper()))
         data_path = data_dir / f'{dataset.name}.csv'
-        rule_list = run_cn2(data_path,
-                            dataset.continuous_attributes,
-                            verbose=True)
+        rule_list, train_acc, test_acc = run_cn2(data_path,
+                                                 dataset.continuous_attributes,
+                                                 verbose=True)
+        print(f'Train accuracy: {train_acc:.2f}')
+        print(f'Test accuracy: {test_acc:.2f}')
         # save rules in csv
         pd.DataFrame(rule_list,
-                     columns=['rule', 'precision', 'recall']).\
+                     columns=['rule', 'precision', 'recall']). \
             to_csv(data_dir / f'{dataset.name}_rules.csv')
         print('')
