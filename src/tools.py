@@ -89,7 +89,7 @@ def split_dataframes(df: pd.DataFrame,
 
 def preprocess_data(df,
                     continuous_attributes: List[str],
-                    n_bins=5):
+                    n_bins=3):
     """
     This function preprocesses the given dataframe df by performing
     the following steps:
@@ -136,7 +136,7 @@ def preprocess_data(df,
     for attribute in continuous_attributes:
         dis = KBinsDiscretizer(n_bins=n_bins,
                                encode='ordinal',
-                               strategy='quantile')
+                               strategy='kmeans')
         attribute_values = processed_df[attribute].values. \
             reshape(-1, 1)
         discrete_attribute = dis.fit_transform(attribute_values)

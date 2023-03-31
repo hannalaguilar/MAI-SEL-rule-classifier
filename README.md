@@ -15,8 +15,13 @@ conda create --name cn2-py310 python=3.10
 conda activate cn2-py310
 pip install -r requirements.txt
  ```
-### Run the tests:
 
+### Run main.py:
  ```
-pytest -xs test.py
+python src/main.py
  ```
+
+It will showcase the rule list, training accuracy, testing accuracy, 
+and training time for the Iris and Titanic datasets. 
+However, it should be noted that the Obesity dataset has been excluded
+from this list due to its lengthy runtime.
