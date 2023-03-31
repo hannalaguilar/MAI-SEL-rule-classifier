@@ -1,14 +1,44 @@
+"""
+Main tools for performing the CN2 algorithm
+"""
 import itertools
-from typing import List
-
+from typing import List, Union
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from scipy import stats as stats
 
-from src.cn2 import Rule, DataCSV
+
+@dataclass
+class Rule:
+    attribute: Union[int, str]
+    value: int
+
+    def __str__(self):
+        return f'{self.attribute}={self.value}'
 
 
-def remove_null_rules(rules):
+@dataclass
+class DataCSV:
+    df: pd.DataFrame
+
+    @property
+    def target_name(self) -> str:
+        return self.df.columns[-1]
+
+    @property
+    def n_classes(self) -> int:
+        return self.df.iloc[:, -1].nunique()
+
+    @property
+    def selectors(self) -> list[Rule]:
+        unique_values = self.df.iloc[:, :-1]. \
+            apply(lambda col: sorted(col.unique())).reset_index().values
+        return [Rule(attribute=row[0], value=val) for row in
+                unique_values for val in row[1]]
+
+
+def remove_null_rules(rules: List[Rule]) -> List[Rule]:
     for rule in rules[:]:
         for rule1, rule2 in itertools.combinations(rule, 2):
             if rule1.attribute == rule2.attribute:
@@ -18,17 +48,20 @@ def remove_null_rules(rules):
 
 def sort_by_complex(complex_quality: list[tuple[float, int]],
                     new_star: List[Rule]) -> List[Rule]:
-    return [x for _, x in sorted(zip(complex_quality,
-                                     new_star),
+    return [x for _, x in sorted(zip(complex_quality, new_star),
                                  key=lambda pair: pair[0], reverse=True)]
 
 
-def complex_score(df, n_classes, complex):
+def complex_score(df: pd.DataFrame,
+                  n_classes: int,
+                  complex: List[Rule]) -> float:
     class_dist = calculate_class_dist(complex, df, n_classes)
     return entropy(class_dist)
 
 
-def user_criteria(data, n_classes, cpx, best_cpx):
+def user_criteria(data: DataCSV, n_classes: int,
+                  cpx: List[Rule],
+                  best_cpx: List[Rule]) -> bool:
     df = data.df
     cpx_quality = complex_score(df, n_classes, cpx)
     best_cpx_quality = complex_score(df, n_classes, best_cpx)
@@ -37,11 +70,9 @@ def user_criteria(data, n_classes, cpx, best_cpx):
 
 def complex_score_list(new_star: List[Rule],
                        data: DataCSV,
-                       n_classes) -> list[tuple[float, int]]:
+                       n_classes) -> list[float, int]:
     df = data.df
     return [complex_score(df, n_classes, complex) for complex in new_star]
-    # return [(entropy(calculate_class_dist(complex, df, n_classes)),
-    #          len(complex)) for complex in new_star]
 
 
 def get_covered_examples(df: pd.DataFrame, complex) -> pd.Series:
@@ -51,7 +82,7 @@ def get_covered_examples(df: pd.DataFrame, complex) -> pd.Series:
     return covered_examples
 
 
-def calculate_class_dist(complex: list[Rule],
+def calculate_class_dist(complex: List[Rule],
                          df: pd.DataFrame,
                          n_classes: int) -> np.ndarray:
     Y = df.iloc[:, -1].values
@@ -99,21 +130,15 @@ def entropy(class_dist: np.ndarray) -> float:
     return -class_dist.sum()
 
 
-def rule_list_consequent(rule_list):
-    for cpx, consequent in rule_list:
-        conditions = [str(rule) for rule in cpx]
-        cpx = ' AND '.join(conditions)
-        cpx_print = f'IF {cpx} THEN {consequent}'
-        print(cpx_print)
-
-
-def get_recall_precision(data, cpx):
+def get_recall_precision(data: DataCSV, cpx: List[Rule]) -> \
+        tuple[float, float]:
     # covered examples
     covered_examples = get_covered_examples(data.df, cpx)
     subset = data.df[covered_examples]
 
     # consequent
-    consequent = np.argmax(subset.iloc[:, -1].value_counts().values)
+    consequent = subset.iloc[:, -1].value_counts().sort_values(
+        ascending=False).index[0]
 
     # original data
     dataset_values = data.df.iloc[:, -1].value_counts()
